@@ -21,7 +21,6 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"fmt"
-	"hash"
 	"io"
 	"log"
 	"net/http"
@@ -44,7 +43,6 @@ type Repomd struct {
 type RepoHashFile struct {
 	Checksum     string
 	ChecksumType string
-	Hash         hash.Hash
 	Size         int
 }
 
@@ -105,16 +103,7 @@ func readRepomdFile(repomdFile string) *Repomd {
 				fmt.Println("Invalid file size", parts[1])
 				return nil
 			}
-			var hashtype hash.Hash
-			switch section {
-			case "md5":
-				hashtype = md5.New()
-			case "sha256":
-				hashtype = sha256.New()
-			case "sha512":
-				hashtype = sha512.New()
-			}
-			dat.Data[parts[2]] = RepoHashFile{Checksum: parts[0], ChecksumType: section, Hash: hashtype, Size: size}
+			dat.Data[parts[2]] = RepoHashFile{Checksum: parts[0], ChecksumType: section, Size: size}
 		} else {
 			parts := strings.SplitN(strings.TrimSpace(line), ":", 2)
 			if len(parts) != 2 {
@@ -177,11 +166,16 @@ func readWithChecksum(fileName, checksum, checksumType string) *[]byte {
 	var sum string
 
 	switch strings.ToLower(checksumType) {
+	case "md5":
+		sum = fmt.Sprintf("%x", md5.Sum(contents))
 	case "sha256":
 		sum = fmt.Sprintf("%x", sha256.Sum256(contents))
+	case "sha512":
+		sum = fmt.Sprintf("%x", sha512.Sum512(contents))
 	}
 
 	if sum == checksum {
+		//fmt.Println("sum", sum, checksum)
 		return &contents
 	}
 	return nil

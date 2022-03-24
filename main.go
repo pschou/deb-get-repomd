@@ -15,9 +15,12 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"flag"
 	"fmt"
 	"hash"
+	"io"
 	"log"
 	"os"
 	"path"
@@ -176,11 +179,16 @@ func main() {
 	}
 
 	var hasPackagesGZ bool
+	var hasPackages bool
 	for filePath, _ := range latestRepomd.Data {
 		//fmt.Println(path, repoPathUpper)
-		if strings.HasPrefix(filePath, repoPathUpper) &&
-			strings.HasSuffix(filePath, "/Packages.gz") {
-			hasPackagesGZ = true
+		if strings.HasPrefix(filePath, repoPathUpper) {
+			if strings.HasSuffix(filePath, "/Packages.gz") {
+				hasPackagesGZ = true
+			}
+			if strings.HasSuffix(filePath, "/Packages") {
+				hasPackages = true
+			}
 		}
 	}
 
@@ -211,6 +219,19 @@ RepoMdFile:
 					defer f.Close()
 					_, err = f.Write(*fileData)
 					if err == nil {
+						if strings.HasSuffix(filePath, "/Packages.gz") && hasPackages {
+							f_uncompress, err := os.Create(path.Join(*outputPath, strings.TrimSuffix(file, ".gz")))
+							if err != nil {
+								log.Fatal(err)
+							}
+							defer f_uncompress.Close()
+							gz, err := gzip.NewReader(bytes.NewReader(*fileData))
+							if err != nil {
+								log.Fatal(err)
+							}
+							io.Copy(f_uncompress, gz)
+							gz.Close()
+						}
 						continue RepoMdFile
 					}
 				}
