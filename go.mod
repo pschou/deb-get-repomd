@@ -1,0 +1,8 @@
+module main
+
+go 1.16
+
+require (
+	github.com/ulikunitz/xz v0.5.10
+	golang.org/x/crypto v0.0.0-20220307211146-efcb8507fb70
+)
