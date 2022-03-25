@@ -78,6 +78,4 @@ Usage: ./deb-get-repomd [options...]
         Repo path to use in fetching (default "dists/Debian11.2/main/binary-amd64")
 ```
 
-
-
-
+Note: Debian GPG keys can be found at: https://ftp-master.debian.org/keys.html

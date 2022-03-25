@@ -40,7 +40,10 @@ func loadKeys(keyfile string) (keyring openpgp.EntityList, err error) {
 			if err == nil {
 				for _, key := range loaded_keys {
 					keyring = append(keyring, key)
-					fmt.Printf("  %d) Loaded KeyID: 0x%02X\n", i, key.PrimaryKey.KeyId)
+					fmt.Printf("  %d) Loaded Primary Key (0x%02X)\n", i, key.PrimaryKey.KeyId)
+					for _, subkey := range key.Subkeys {
+						fmt.Printf("     Sub Key (0x%02X)\n", subkey.PublicKey.KeyId)
+					}
 				}
 				keystr = ""
 			} else {
