@@ -18,6 +18,7 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/md5"
+	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
 	"fmt"
@@ -31,18 +32,19 @@ import (
 )
 
 type Repomd struct {
-	Header          map[string]string
-	Data            map[string]RepoHashFile
-	fileContents    []byte
-	ascFileContents string
-	path            string
-	mirror          string
-	Timestamp       time.Time
+	Header            map[string]string
+	Data              map[string]*RepoHashFile
+	fileContents      []byte
+	gpgFileContents   string
+	gpgInFileContents string
+	path              string
+	mirror            string
+	Timestamp         time.Time
 }
 
 type RepoHashFile struct {
-	Checksum     string
-	ChecksumType string
+	Checksum     []string
+	ChecksumType []string
 	Size         int
 }
 
@@ -84,7 +86,7 @@ func readRepomdFile(repomdFile string) *Repomd {
 
 	var dat = Repomd{
 		Header: make(map[string]string),
-		Data:   make(map[string]RepoHashFile),
+		Data:   make(map[string]*RepoHashFile),
 	}
 
 	scanner := bufio.NewScanner(bytes.NewReader(contents))
@@ -103,7 +105,16 @@ func readRepomdFile(repomdFile string) *Repomd {
 				fmt.Println("Invalid file size", parts[1])
 				return nil
 			}
-			dat.Data[parts[2]] = RepoHashFile{Checksum: parts[0], ChecksumType: section, Size: size}
+			if current, exist := dat.Data[parts[2]]; exist {
+				current.Checksum = append(current.Checksum, parts[0])
+				current.ChecksumType = append(current.ChecksumType, section)
+				if size != current.Size {
+					log.Println("Error in decoding Release file: mismatching file size", size, current.Size)
+					return nil
+				}
+			} else {
+				dat.Data[parts[2]] = &RepoHashFile{Checksum: []string{parts[0]}, ChecksumType: []string{section}, Size: size}
+			}
 		} else {
 			parts := strings.SplitN(strings.TrimSpace(line), ":", 2)
 			if len(parts) != 2 {
@@ -166,8 +177,10 @@ func readWithChecksum(fileName, checksum, checksumType string) *[]byte {
 	var sum string
 
 	switch strings.ToLower(checksumType) {
-	case "md5":
+	case "md5sum":
 		sum = fmt.Sprintf("%x", md5.Sum(contents))
+	case "sha1":
+		sum = fmt.Sprintf("%x", sha1.Sum(contents))
 	case "sha256":
 		sum = fmt.Sprintf("%x", sha256.Sum256(contents))
 	case "sha512":

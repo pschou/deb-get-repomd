@@ -51,7 +51,7 @@ func readMirrors(mirrorFile string) []string {
 }
 
 func ensureDir(dirName string) error {
-	err := os.Mkdir(dirName, 0755)
+	err := os.MkdirAll(dirName, 0755)
 	if err == nil {
 		return nil
 	}

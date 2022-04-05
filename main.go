@@ -35,6 +35,8 @@ import (
 
 var version = "test"
 
+var makeTree *bool
+
 // Main is a function to fetch the HTTP repodata from a URL to get the latest
 // package list for a repo
 func main() {
@@ -47,6 +49,7 @@ func main() {
 	var mirrorList = flag.String("mirrors", "mirrorlist.txt", "Mirror / directory list of prefixes to use")
 	var outputPath = flag.String("output", ".", "Path to put the repodata files")
 	var insecure = flag.Bool("insecure", false, "Skip signature checks")
+	makeTree = flag.Bool("tree", false, "Make repo tree (recommended, provides gpg and InRelease files)")
 	var keyringFile = flag.String("keyring", "keys/", "Use keyring for verifying, keyring.gpg or keys/ directory")
 	flag.Parse()
 
@@ -90,6 +93,7 @@ func main() {
 		//repomdPath := m + repoPath + "Packages.gz"
 		releasePath := m + repoPathBottom2 + "/Release"
 		releasePathGPG := releasePath + ".gpg"
+		releasePathInGPG := m + repoPathBottom2 + "/InRelease"
 		log.Println(i, "Fetching", releasePath)
 
 		dat := readRepomdFile(releasePath)
@@ -150,16 +154,16 @@ func main() {
 					}
 					if len(keys) > 1 {
 						fmt.Println("warning: More than one public key found matching KeyID")
-						continue
 					}
 
-					dat.ascFileContents = gpgFile
+					dat.gpgFileContents = gpgFile
 					fmt.Println("GPG Verified!")
+					dat.gpgInFileContents = readFile(releasePathInGPG)
 				}
 				if latestRepomdTime != 0 {
 					log.Println("found newer")
 				}
-				readFile(releasePathGPG)
+				//readFile(releasePathGPG)
 				dat.path = releasePath
 				dat.mirror = m
 				latestRepomd = *dat
@@ -168,35 +172,47 @@ func main() {
 		}
 	}
 
+	var byHash bool
+	if t, ok := latestRepomd.Header["Acquire-By-Hash"]; ok && t == "yes" {
+		byHash = true
+	}
+
 	//log.Printf("latest: %+v", latestRepomd)
 	trylist := []string{latestRepomd.mirror}
 	trylist = append(trylist, mirrors...)
 
+	outputPathFull := *outputPath
+	if *makeTree {
+		outputPathFull = path.Join(*outputPath, *inRepoPath)
+	}
+
 	// Create the directory if needed
-	err := ensureDir(*outputPath)
+	err := ensureDir(outputPathFull)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var hasPackagesGZ bool
-	var hasPackages bool
+	// Flags to help us avoid downloading an uncompressed version of Packages
+	var hasPackagesGZ, hasPackages bool
+	//var packagesMeta RepoHashFile
 	for filePath, _ := range latestRepomd.Data {
-		//fmt.Println(path, repoPathUpper)
 		if strings.HasPrefix(filePath, repoPathUpper) {
 			if strings.HasSuffix(filePath, "/Packages.gz") {
 				hasPackagesGZ = true
 			}
 			if strings.HasSuffix(filePath, "/Packages") {
 				hasPackages = true
+				//packagesMeta = *meta
 			}
 		}
 	}
+	byHashDir := path.Join(outputPathFull, "by-hash")
 
 RepoMdFile:
 	for filePath, meta := range latestRepomd.Data {
 		//fmt.Println(path, repoPathUpper)
 		if strings.HasPrefix(filePath, repoPathUpper) {
-			// skip the uncompressed file!
+			// skip the downloading uncompressed file
 			if hasPackagesGZ && strings.HasSuffix(filePath, "/Packages") {
 				continue
 			}
@@ -204,33 +220,44 @@ RepoMdFile:
 			for _, tryMirror := range trylist {
 				fileURL := tryMirror + repoPathBottom2 + "/" + filePath
 				fmt.Println("getting", fileURL)
-				fileData := readWithChecksum(fileURL, meta.Checksum, meta.ChecksumType)
-				if fileData != nil {
-					//fmt.Println("length", len(*fileData))
-					//u, err := url.Parse(fileURL)
-					//if err != nil {
-					//	continue
-					//}
+				//, meta.Checksum[len(meta.Checksum)-1], meta.ChecksumType[len(meta.ChecksumType)-1])
+				fileData := readWithChecksum(fileURL,
+					meta.Checksum[len(meta.Checksum)-1],
+					meta.ChecksumType[len(meta.ChecksumType)-1])
+				if fileData == nil {
+					fmt.Println("  trying a different mirror")
+				} else {
+					// Write out the file
 					_, file := path.Split(fileURL)
-					f, err := os.Create(path.Join(*outputPath, file))
-					if err != nil {
-						log.Fatal(err)
+					outFile := path.Join(outputPathFull, file)
+					writeFile(outFile, fileData, latestRepomd.Timestamp)
+
+					if byHash {
+						for j, ckSumType := range meta.ChecksumType {
+							ckSumDir := path.Join(byHashDir, ckSumType)
+							ensureDir(ckSumDir)
+							outFile := path.Join(ckSumDir, meta.Checksum[j])
+							writeFile(outFile, fileData, latestRepomd.Timestamp)
+						}
 					}
-					defer f.Close()
-					_, err = f.Write(*fileData)
+
 					if err == nil {
 						if strings.HasSuffix(filePath, "/Packages.gz") && hasPackages {
-							f_uncompress, err := os.Create(path.Join(*outputPath, strings.TrimSuffix(file, ".gz")))
-							if err != nil {
-								log.Fatal(err)
-							}
-							defer f_uncompress.Close()
-							gz, err := gzip.NewReader(bytes.NewReader(*fileData))
-							if err != nil {
-								log.Fatal(err)
-							}
-							io.Copy(f_uncompress, gz)
-							gz.Close()
+							outFile = path.Join(outputPathFull, strings.TrimSuffix(file, ".gz"))
+							writeUncompressedFile(outFile, fileData, latestRepomd.Timestamp)
+
+							// Don't need to waste space if we don't need this file
+							/*
+								if byHash {
+									for j, ckSumType := range packagesMeta.ChecksumType {
+										ckSumDir := path.Join(byHashDir, ckSumType)
+										ensureDir(ckSumDir)
+										outFile := path.Join(ckSumDir, packagesMeta.Checksum[j])
+										writeUncompressedFile(outFile, fileData, latestRepomd.Timestamp)
+									}
+								}
+							*/
+
 						}
 						continue RepoMdFile
 					}
@@ -239,60 +266,82 @@ RepoMdFile:
 
 		}
 	}
-	/*
-	   	// Write out the repomd file into the path
-	   	{
-	   		f, err := os.Create(path.Join(*outputPath, "repomd.xml"))
-	   		if err != nil {
-	   			log.Fatal(err)
-	   		}
-	   		defer f.Close()
-	   		_, err = f.Write(latestRepomd.fileContents)
-	   		if err != nil {
-	   			log.Fatal("Cannot write repomd.xml", err)
-	   		}
-	   	}
+	if *makeTree {
+		outputBottomTwo := path.Join(*outputPath, repoPathBottom2)
+		// Write out the repomd file into the path
+		{
+			outFile := path.Join(outputBottomTwo, "Release")
+			f, err := os.Create(outFile)
+			if err != nil {
+				log.Fatal(err)
+			}
+			_, err = f.Write(latestRepomd.fileContents)
+			if err != nil {
+				log.Fatal("Cannot write Release", err)
+			}
+			f.Close()
+			timestamp := time.Unix(latestRepomdTime, 0)
+			os.Chtimes(outFile, timestamp, timestamp)
+		}
 
-	   	// If we have a signature file, write it out
-	   	if len(latestRepomd.ascFileContents) > 0 {
-	   		f, err := os.Create(path.Join(*outputPath, "repomd.xml.asc"))
-	   		if err != nil {
-	   			log.Fatal(err)
-	   		}
-	   		defer f.Close()
-	   		_, err = f.Write(latestRepomd.fileContents)
-	   		if err != nil {
-	   			log.Fatal("Cannot write repomd.xml", err)
-	   		}
-	   	}
+		// If we have a signature file, write it out
+		if len(latestRepomd.gpgFileContents) > 0 {
+			outFile := path.Join(outputBottomTwo, "Release.gpg")
+			f, err := os.Create(outFile)
+			if err != nil {
+				log.Fatal(err)
+			}
+			_, err = f.Write([]byte(latestRepomd.gpgFileContents))
+			if err != nil {
+				log.Fatal("Cannot write Release.gpg", err)
+			}
+			f.Close()
+			timestamp := time.Unix(latestRepomdTime, 0)
+			os.Chtimes(outFile, timestamp, timestamp)
+		}
 
-	   RepoMdFile:
-	   	for _, filePath := range latestRepomd.Data {
-	   		for _, tryMirror := range trylist {
-	   			fileURL := tryMirror + "/" + repoPath + "/" + strings.TrimPrefix(filePath.Location.Href, "/")
-	   			fmt.Println("getting", fileURL)
-	   			fileData := readWithChecksum(fileURL, filePath.Checksum.Text, filePath.Checksum.Type)
-	   			if fileData != nil {
-	   				//fmt.Println("length", len(*fileData))
-	   				//u, err := url.Parse(fileURL)
-	   				//if err != nil {
-	   				//	continue
-	   				//}
-	   				_, file := path.Split(fileURL)
-	   				f, err := os.Create(path.Join(*outputPath, file))
-	   				if err != nil {
-	   					log.Fatal(err)
-	   				}
-	   				defer f.Close()
-	   				_, err = f.Write(*fileData)
-	   				if err == nil {
-	   					continue RepoMdFile
-	   				}
-	   			}
-	   		}
-	   	}
-	*/
+		if len(latestRepomd.gpgInFileContents) > 0 {
+			outFile := path.Join(outputBottomTwo, "InRelease")
+			f, err := os.Create(outFile)
+			if err != nil {
+				log.Fatal(err)
+			}
+			_, err = f.Write([]byte(latestRepomd.gpgInFileContents))
+			if err != nil {
+				log.Fatal("Cannot write InRelease", err)
+			}
+			f.Close()
+			timestamp := time.Unix(latestRepomdTime, 0)
+			os.Chtimes(outFile, timestamp, timestamp)
+		}
+	}
+}
 
+func writeFile(outFile string, fileData *[]byte, Timestamp time.Time) {
+	fmt.Println("writing", outFile)
+	f, err := os.Create(outFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = f.Write(*fileData)
+	f.Close()
+	os.Chtimes(outFile, Timestamp, Timestamp)
+}
+
+func writeUncompressedFile(outFile string, fileData *[]byte, Timestamp time.Time) {
+	fmt.Println("writing comp", outFile)
+	f_uncompress, err := os.Create(outFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	gz, err := gzip.NewReader(bytes.NewReader(*fileData))
+	if err != nil {
+		log.Fatal(err)
+	}
+	io.Copy(f_uncompress, gz)
+	gz.Close()
+	f_uncompress.Close()
+	os.Chtimes(outFile, Timestamp, Timestamp)
 }
 
 func check(e error) {

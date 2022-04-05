@@ -5,13 +5,12 @@ verifies the PGP signature and checksums of each file to ensure integrity.
 
 # Example usage:
 ```bash
-./deb-get-repomd -mirrors mirrorlist.txt -repo dists/Debian11.2/main/binary-amd64 -keyring keys/ -output test
+./deb-get-repomd -mirrors mirrorlist.txt -repo dists/stable/main/binary-amd64 -keyring keys/ -tree -output test
 ```
 
 and the output looks like:
 ```
-$ ./deb-get-repomd -output test
-CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=0.1.20220323.2107" -o "deb-get-repomd" main.go repomd.go filelib.go loadKeys.go
+$ ./deb-get-repomd -output test -repo dists/stable/main/binary-amd64 -tree
 2022/03/23 21:07:10 Reading in file keys/debian11.gpg
   1) Loaded KeyID: 0xDC30D7C23CBBABEE
 2022/03/23 21:07:10 0 Fetching http://ftp.us.debian.org/debian/dists/Debian11.2/Release
@@ -76,6 +75,8 @@ Usage: ./deb-get-repomd [options...]
         Path to put the repodata files (default ".")
   -repo string
         Repo path to use in fetching (default "dists/Debian11.2/main/binary-amd64")
+  -tree
+        Make repo tree (recommended, provides gpg and InRelease files)
 ```
 
 Note: Debian GPG keys can be found at: https://ftp-master.debian.org/keys.html
