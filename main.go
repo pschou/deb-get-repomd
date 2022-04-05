@@ -226,41 +226,41 @@ RepoMdFile:
 					meta.ChecksumType[len(meta.ChecksumType)-1])
 				if fileData == nil {
 					fmt.Println("  trying a different mirror")
-				} else {
-					// Write out the file
-					_, file := path.Split(fileURL)
-					outFile := path.Join(outputPathFull, file)
-					writeFile(outFile, fileData, latestRepomd.Timestamp)
+					continue
+				}
+				// Write out the file
+				_, file := path.Split(fileURL)
+				outFile := path.Join(outputPathFull, file)
+				writeFile(outFile, fileData, latestRepomd.Timestamp)
 
-					if byHash {
-						for j, ckSumType := range meta.ChecksumType {
-							ckSumDir := path.Join(byHashDir, ckSumType)
-							ensureDir(ckSumDir)
-							outFile := path.Join(ckSumDir, meta.Checksum[j])
-							writeFile(outFile, fileData, latestRepomd.Timestamp)
-						}
+				if byHash {
+					for j, ckSumType := range meta.ChecksumType {
+						ckSumDir := path.Join(byHashDir, ckSumType)
+						ensureDir(ckSumDir)
+						outFile := path.Join(ckSumDir, meta.Checksum[j])
+						writeFile(outFile, fileData, latestRepomd.Timestamp)
 					}
+				}
 
-					if err == nil {
-						if strings.HasSuffix(filePath, "/Packages.gz") && hasPackages {
-							outFile = path.Join(outputPathFull, strings.TrimSuffix(file, ".gz"))
-							writeUncompressedFile(outFile, fileData, latestRepomd.Timestamp)
+				if err == nil {
+					if strings.HasSuffix(filePath, "/Packages.gz") && hasPackages {
+						outFile = path.Join(outputPathFull, strings.TrimSuffix(file, ".gz"))
+						writeUncompressedFile(outFile, fileData, latestRepomd.Timestamp)
 
-							// Don't need to waste space if we don't need this file
-							/*
-								if byHash {
-									for j, ckSumType := range packagesMeta.ChecksumType {
-										ckSumDir := path.Join(byHashDir, ckSumType)
-										ensureDir(ckSumDir)
-										outFile := path.Join(ckSumDir, packagesMeta.Checksum[j])
-										writeUncompressedFile(outFile, fileData, latestRepomd.Timestamp)
-									}
+						// Don't need to waste space if we don't need this file
+						/*
+							if byHash {
+								for j, ckSumType := range packagesMeta.ChecksumType {
+									ckSumDir := path.Join(byHashDir, ckSumType)
+									ensureDir(ckSumDir)
+									outFile := path.Join(ckSumDir, packagesMeta.Checksum[j])
+									writeUncompressedFile(outFile, fileData, latestRepomd.Timestamp)
 								}
-							*/
+							}
+						*/
 
-						}
-						continue RepoMdFile
 					}
+					continue RepoMdFile
 				}
 			}
 
