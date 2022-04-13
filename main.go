@@ -45,7 +45,7 @@ func main() {
 		flag.PrintDefaults()
 	}
 
-	var inRepoPath = flag.String("repo", "dists/Debian11.2/main/binary-amd64", "Repo path to use in fetching")
+	var inRepoPath = flag.String("repo", "dists/stable/main/binary-amd64", "Repo path to use in fetching")
 	var mirrorList = flag.String("mirrors", "mirrorlist.txt", "Mirror / directory list of prefixes to use")
 	var outputPath = flag.String("output", ".", "Path to put the repodata files")
 	var insecure = flag.Bool("insecure", false, "Skip signature checks")
