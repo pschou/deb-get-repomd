@@ -26,6 +26,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/openpgp"
@@ -89,88 +90,101 @@ func main() {
 	repoPathBottom2 := getBottomDir(repoPath, 2)
 	repoPathUpper := strings.TrimPrefix(repoPath, repoPathBottom2+"/")
 
-	for i, m := range mirrors {
-		//repomdPath := m + repoPath + "Packages.gz"
-		releasePath := m + repoPathBottom2 + "/Release"
-		releasePathGPG := releasePath + ".gpg"
-		releasePathInGPG := m + repoPathBottom2 + "/InRelease"
-		log.Println(i, "Fetching", releasePath)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
 
-		dat := readRepomdFile(releasePath)
-		if dat != nil {
-			if dat.Timestamp.Unix() > latestRepomdTime {
-				if !*insecure {
-					// Verify gpg signature file
-					log.Println("Fetching signature file:", releasePathGPG)
-					gpgFile := readFile(releasePathGPG)
-					signature_block, err := armor.Decode(strings.NewReader(gpgFile))
-					if err != nil {
-						log.Println("Unable decode signature")
-						continue
-					}
-					p, err := packet.Read(signature_block.Body)
-					if err != nil {
-						log.Println("Unable parse signature")
-						continue
-					}
-					var signed_at time.Time
-					var issuerKeyId uint64
-					var hash hash.Hash
+	for j, mm := range mirrors {
+		i := j
+		m := mm
+		time.Sleep(70 * time.Millisecond)
+		go func() {
+			wg.Add(1)
+			defer wg.Done()
+			//repomdPath := m + repoPath + "Packages.gz"
+			releasePath := m + repoPathBottom2 + "/Release"
+			releasePathGPG := releasePath + ".gpg"
+			releasePathInGPG := m + repoPathBottom2 + "/InRelease"
+			log.Println(i, "Fetching", releasePath)
 
-					switch sig := p.(type) {
-					case *packet.Signature:
-						issuerKeyId = *sig.IssuerKeyId
-						signed_at = sig.CreationTime
-						if hash == nil {
-							hash = sig.Hash.New()
+			dat := readRepomdFile(releasePath)
+			mu.Lock()
+			defer mu.Unlock()
+			if dat != nil {
+				if dat.Timestamp.Unix() > latestRepomdTime {
+					if !*insecure {
+						// Verify gpg signature file
+						log.Println("Fetching signature file:", releasePathGPG)
+						gpgFile := readFile(releasePathGPG)
+						signature_block, err := armor.Decode(strings.NewReader(gpgFile))
+						if err != nil {
+							log.Println("Unable decode signature")
+							return
 						}
-					case *packet.SignatureV3:
-						issuerKeyId = sig.IssuerKeyId
-						signed_at = sig.CreationTime
-						if hash == nil {
-							hash = sig.Hash.New()
+						p, err := packet.Read(signature_block.Body)
+						if err != nil {
+							log.Println("Unable parse signature")
+							return
 						}
-					default:
-						fmt.Println("Signature block is invalid")
-						continue
-					}
+						var signed_at time.Time
+						var issuerKeyId uint64
+						var hash hash.Hash
 
-					if issuerKeyId == 0 {
-						fmt.Println("Signature doesn't have an issuer")
-						continue
-					}
+						switch sig := p.(type) {
+						case *packet.Signature:
+							issuerKeyId = *sig.IssuerKeyId
+							signed_at = sig.CreationTime
+							if hash == nil {
+								hash = sig.Hash.New()
+							}
+						case *packet.SignatureV3:
+							issuerKeyId = sig.IssuerKeyId
+							signed_at = sig.CreationTime
+							if hash == nil {
+								hash = sig.Hash.New()
+							}
+						default:
+							fmt.Println("Signature block is invalid")
+							return
+						}
 
-					if keyring == nil {
-						fmt.Printf("  %s - Signed by 0x%02X at %v\n", releasePathGPG, issuerKeyId, signed_at)
-						os.Exit(1)
-					} else {
-						fmt.Printf("Verifying %s has been signed by 0x%02X at %v...\n", releasePathGPG, issuerKeyId, signed_at)
-					}
-					keys := keyring.KeysByIdUsage(issuerKeyId, packet.KeyFlagSign)
+						if issuerKeyId == 0 {
+							fmt.Println("Signature doesn't have an issuer")
+							return
+						}
 
-					if len(keys) == 0 {
-						fmt.Println("error: No matching public key found to verify")
-						continue
-					}
-					if len(keys) > 1 {
-						fmt.Println("warning: More than one public key found matching KeyID")
-					}
+						if keyring == nil {
+							fmt.Printf("  %s - Signed by 0x%02X at %v\n", releasePathGPG, issuerKeyId, signed_at)
+							os.Exit(1)
+						} else {
+							fmt.Printf("Verifying %s has been signed by 0x%02X at %v...\n", releasePathGPG, issuerKeyId, signed_at)
+						}
+						keys := keyring.KeysByIdUsage(issuerKeyId, packet.KeyFlagSign)
 
-					dat.gpgFileContents = gpgFile
-					fmt.Println("GPG Verified!")
-					dat.gpgInFileContents = readFile(releasePathInGPG)
+						if len(keys) == 0 {
+							fmt.Println("error: No matching public key found to verify")
+							return
+						}
+						if len(keys) > 1 {
+							fmt.Println("warning: More than one public key found matching KeyID")
+						}
+
+						dat.gpgFileContents = gpgFile
+						fmt.Println("GPG Verified!")
+						dat.gpgInFileContents = readFile(releasePathInGPG)
+					}
+					if latestRepomdTime != 0 {
+						log.Println("found newer")
+					}
+					//readFile(releasePathGPG)
+					dat.path = releasePath
+					dat.mirror = m
+					latestRepomd = *dat
+					latestRepomdTime = dat.Timestamp.Unix()
 				}
-				if latestRepomdTime != 0 {
-					log.Println("found newer")
-				}
-				//readFile(releasePathGPG)
-				dat.path = releasePath
-				dat.mirror = m
-				latestRepomd = *dat
-				latestRepomdTime = dat.Timestamp.Unix()
 			}
-		}
+		}()
 	}
+	wg.Wait()
 
 	var byHash bool
 	if t, ok := latestRepomd.Header["Acquire-By-Hash"]; ok && t == "yes" {
