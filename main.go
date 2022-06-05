@@ -97,8 +97,8 @@ func main() {
 		i := j
 		m := mm
 		time.Sleep(70 * time.Millisecond)
+		wg.Add(1)
 		go func() {
-			wg.Add(1)
 			defer wg.Done()
 			//repomdPath := m + repoPath + "Packages.gz"
 			releasePath := m + repoPathBottom2 + "/Release"
