@@ -226,6 +226,7 @@ func main() {
 	}
 	byHashDir := path.Join(outputPathFull, "by-hash")
 	if !(hasPackagesGZ || hasPackages) {
+		fmt.Println("Looked for both Packages and Packages.gz at", filepath)
 		fmt.Println("Note: Make sure your \"repo\" is set to the child path under the mirror URL with the file containing Packages.gz")
 	}
 
