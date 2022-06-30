@@ -52,7 +52,7 @@ var client = http.Client{
 	Timeout: 5 * time.Second,
 }
 
-func readRepomdFile(repomdFile string) *Repomd {
+func readRepomdFile(repomdFile string, mirror string) *Repomd {
 	// Declare file handle for the reading
 	var file io.Reader
 
@@ -120,9 +120,9 @@ func readRepomdFile(repomdFile string) *Repomd {
 		} else {
 			parts := strings.SplitN(strings.TrimSpace(line), ":", 2)
 			if len(parts) != 2 {
-				log.Println("Error in decoding Release file header, line", line_number, ":", line)
+				log.Println("Error in decoding Release file header on", mirror, ", line", line_number, ":", line)
 				if line_number == 1 {
-					fmt.Println("  note: when picking a mirror url for the mirrorlist file, you'll want to find the path which has the child paths /pool/ and /dists/")
+					fmt.Println("  note: when picking a mirror url for the mirrorlist file, you'll want to find the path which has the child paths /pool/ and /dists/ and the repo is the sub path to the Packages.gz")
 				}
 				return nil
 			}

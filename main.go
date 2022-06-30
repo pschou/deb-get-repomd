@@ -104,7 +104,7 @@ func main() {
 			releasePathInGPG := m + repoPathBottom2 + "/InRelease"
 			log.Println(i, "Fetching", releasePath)
 
-			dat := readRepomdFile(releasePath)
+			dat := readRepomdFile(releasePath, m)
 			mu.Lock()
 			defer mu.Unlock()
 			if dat != nil {
