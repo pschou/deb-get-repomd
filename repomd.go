@@ -122,7 +122,7 @@ func readRepomdFile(repomdFile string) *Repomd {
 			if len(parts) != 2 {
 				log.Println("Error in decoding Release file header, line", line_number, ":", line)
 				if line_number == 1 {
-					fmt.Println("  note: when picking a mirror url for the mirrorlist file, you'll want to find the path which has the child path /pool/ directly in it")
+					fmt.Println("  note: when picking a mirror url for the mirrorlist file, you'll want to find the path which has the child paths /pool/ and /dists/")
 				}
 				return nil
 			}

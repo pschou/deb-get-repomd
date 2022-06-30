@@ -171,7 +171,7 @@ func main() {
 						fmt.Println("GPG Verified!")
 						dat.gpgInFileContents = readFile(releasePathInGPG)
 					}
-					if latestRepomdTime != 0 {
+					if latestRepomdTime == 0 {
 						log.Println("using first")
 					} else {
 						log.Println("found newer")
@@ -193,6 +193,7 @@ func main() {
 	if t, ok := latestRepomd.Header["Acquire-By-Hash"]; ok && t == "yes" {
 		byHash = true
 	}
+	fmt.Println("Acquire-By-Hash is", byHash)
 
 	//log.Printf("latest: %+v", latestRepomd)
 	trylist := []string{latestRepomd.mirror}
@@ -206,7 +207,7 @@ func main() {
 	// Create the directory if needed
 	err := ensureDir(outputPathFull)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Could not create the directory", err)
 	}
 
 	// Flags to help us avoid downloading an uncompressed version of Packages
@@ -224,6 +225,9 @@ func main() {
 		}
 	}
 	byHashDir := path.Join(outputPathFull, "by-hash")
+	if !(hasPackagesGZ || hasPackages) {
+		fmt.Println("Note: Make sure your \"repo\" is set to the child path under the mirror URL with the file containing Packages.gz")
+	}
 
 RepoMdFile:
 	for filePath, meta := range latestRepomd.Data {
