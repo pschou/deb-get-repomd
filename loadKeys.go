@@ -27,6 +27,21 @@ func loadKeys(keyfile string) (keyring openpgp.EntityList, err error) {
 	scanner := bufio.NewScanner(strings.NewReader(keyfile))
 	var line, keystr string
 	var i int
+	if len(keyfile) > 4 && keyfile[0] == 0x99 && keyfile[1] == 0x02 {
+		loaded_keys, err = openpgp.ReadKeyRing(strings.NewReader(keyfile))
+		if err == nil {
+			for _, key := range loaded_keys {
+				keyring = append(keyring, key)
+				fmt.Printf("  %d) Loaded Primary Key (0x%02X)\n", i, key.PrimaryKey.KeyId)
+				for _, subkey := range key.Subkeys {
+					fmt.Printf("     Sub Key (0x%02X)\n", subkey.PublicKey.KeyId)
+				}
+			}
+			keystr = ""
+		} else {
+			fmt.Printf("  %d) Invalid key: %g\n", i, err)
+		}
+	}
 	for {
 		if scanner.Scan() {
 			line = scanner.Text()
