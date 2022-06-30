@@ -118,7 +118,7 @@ func readRepomdFile(repomdFile string) *Repomd {
 		} else {
 			parts := strings.SplitN(strings.TrimSpace(line), ":", 2)
 			if len(parts) != 2 {
-				log.Println("Error in decoding Release file header")
+				log.Println("Error in decoding Release file header, line:", line)
 				return nil
 			}
 			if val := strings.TrimSpace(parts[1]); val == "" {
