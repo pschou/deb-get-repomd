@@ -91,7 +91,9 @@ func readRepomdFile(repomdFile string) *Repomd {
 
 	scanner := bufio.NewScanner(bytes.NewReader(contents))
 	var section, line string
+	line_number := 0
 	for scanner.Scan() {
+		line_number++
 		line = scanner.Text()
 		//fmt.Println("line:", line)
 		if strings.HasPrefix(line, " ") {
@@ -118,7 +120,10 @@ func readRepomdFile(repomdFile string) *Repomd {
 		} else {
 			parts := strings.SplitN(strings.TrimSpace(line), ":", 2)
 			if len(parts) != 2 {
-				log.Println("Error in decoding Release file header, line:", line)
+				log.Println("Error in decoding Release file header, line", line_number, ":", line)
+				if line_number == 1 {
+					fmt.Println("  note: when picking a mirror url for the mirrorlist file, you'll want to find the path which has the child path /pool/ directly in it")
+				}
 				return nil
 			}
 			if val := strings.TrimSpace(parts[1]); val == "" {

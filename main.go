@@ -110,6 +110,7 @@ func main() {
 			mu.Lock()
 			defer mu.Unlock()
 			if dat != nil {
+				fmt.Println("  found timestamp", dat.Timestamp.Unix())
 				if dat.Timestamp.Unix() > latestRepomdTime {
 					if !*insecure {
 						// Verify gpg signature file
