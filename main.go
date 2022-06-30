@@ -95,10 +95,8 @@ func main() {
 
 	for j, mm := range mirrors {
 		i := j
-		m := mm
-		time.Sleep(70 * time.Millisecond)
 		wg.Add(1)
-		go func() {
+		go func(m string) {
 			defer wg.Done()
 			//repomdPath := m + repoPath + "Packages.gz"
 			releasePath := m + repoPathBottom2 + "/Release"
@@ -110,7 +108,7 @@ func main() {
 			mu.Lock()
 			defer mu.Unlock()
 			if dat != nil {
-				fmt.Println("  found timestamp", dat.Timestamp.Unix())
+				fmt.Println("  found timestamp", dat.Timestamp.Unix(), "in", releasePath)
 				if dat.Timestamp.Unix() > latestRepomdTime {
 					if !*insecure {
 						// Verify gpg signature file
@@ -174,6 +172,8 @@ func main() {
 						dat.gpgInFileContents = readFile(releasePathInGPG)
 					}
 					if latestRepomdTime != 0 {
+						log.Println("using first")
+					} else {
 						log.Println("found newer")
 					}
 					//readFile(releasePathGPG)
@@ -183,9 +183,11 @@ func main() {
 					latestRepomdTime = dat.Timestamp.Unix()
 				}
 			}
-		}()
+		}(mm)
+		time.Sleep(70 * time.Millisecond)
 	}
 	wg.Wait()
+	fmt.Println("Using mirror at", latestRepomd.mirror)
 
 	var byHash bool
 	if t, ok := latestRepomd.Header["Acquire-By-Hash"]; ok && t == "yes" {
