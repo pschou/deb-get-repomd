@@ -29,6 +29,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/araddon/dateparse"
 )
 
 type Repomd struct {
@@ -135,7 +137,9 @@ func readRepomdFile(repomdFile string, mirror string) *Repomd {
 	}
 
 	if val, ok := dat.Header["Date"]; ok {
-		tval, err := time.Parse(time.RFC1123, val)
+		//tval, err := time.Parse(time.RFC1123, val)
+		tval, err := dateparse.ParseStrict(val)
+		// Fri, 1 Jul 2022 10:48:08 UTC
 		if err != nil {
 			fmt.Println("Invalid date format", val)
 			return nil
