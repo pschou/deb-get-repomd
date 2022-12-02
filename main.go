@@ -52,8 +52,10 @@ func main() {
 	var insecure = flag.Bool("insecure", false, "Skip signature checks")
 	makeTree = flag.Bool("tree", false, "Make repo tree (recommended, provides gpg and InRelease files)")
 	var keyringFile = flag.String("keyring", "keys/", "Use keyring for verifying, keyring.gpg or keys/ directory")
+	var timeout = flag.Duration("timeout", 5*time.Second, "HTTP Client Timeout")
 	flag.Parse()
 
+	client.Timeout = *timeout
 	mirrors := readMirrors(*mirrorList)
 	repoPath := strings.TrimSuffix(strings.TrimPrefix(*inRepoPath, "/"), "/")
 

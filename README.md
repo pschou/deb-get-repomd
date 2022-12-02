@@ -75,6 +75,8 @@ Usage: ./deb-get-repomd [options...]
         Path to put the repodata files (default ".")
   -repo string
         Repo path to use in fetching (default "dists/Debian11.2/main/binary-amd64")
+  -timeout duration
+        HTTP Client Timeout (default 5s)
   -tree
         Make repo tree (recommended, provides gpg and InRelease files)
 ```
