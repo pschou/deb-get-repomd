@@ -17,11 +17,13 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"hash"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -37,6 +39,7 @@ import (
 var version = "test"
 
 var makeTree *bool
+var secureUser, securePass *string
 
 // Main is a function to fetch the HTTP repodata from a URL to get the latest
 // package list for a repo
@@ -53,9 +56,21 @@ func main() {
 	makeTree = flag.Bool("tree", false, "Make repo tree (recommended, provides gpg and InRelease files)")
 	var keyringFile = flag.String("keyring", "keys/", "Use keyring for verifying, keyring.gpg or keys/ directory")
 	var timeout = flag.Duration("timeout", 5*time.Second, "HTTP Client Timeout")
+	var secureCert = flag.String("client-cert", "", "Satellite repo, CERT for using PKI auth")
+	var secureKey = flag.String("client-key", "", "Satellite repo, KEY for using PKI auth")
+	secureUser = flag.String("client-user", "", "Satellite repo, using basic USER auth")
+	securePass = flag.String("client-pass", "", "Satellite repo, PASS for USER")
 	flag.Parse()
 
-	client.Timeout = *timeout
+	http.DefaultClient.Timeout = *timeout
+	if *secureCert != "" {
+		if cert, err := tls.LoadX509KeyPair(*secureCert, *secureKey); err != nil {
+			log.Fatal(err)
+		} else {
+			http.DefaultClient.Transport = &http.Transport{TLSClientConfig: &tls.Config{Certificates: []tls.Certificate{cert}}}
+		}
+	}
+
 	mirrors := readMirrors(*mirrorList)
 	repoPath := strings.TrimSuffix(strings.TrimPrefix(*inRepoPath, "/"), "/")
 

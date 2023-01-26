@@ -61,10 +61,18 @@ Packages.gz  Packages.xz  Release
 # Usage help:
 ```bash
 $ ./deb-get-repomd -h
-Debian Get Repo Metadata,  Version: 0.1.20220323.2107
+Debian Get Repo Metadata
 
 Usage: ./deb-get-repomd [options...]
 
+  -client-cert string
+        Satellite repo, CERT for using PKI auth
+  -client-key string
+        Satellite repo, KEY for using PKI auth
+  -client-pass string
+        Satellite repo, PASS for USER
+  -client-user string
+        Satellite repo, using basic USER auth
   -insecure
         Skip signature checks
   -keyring string
@@ -74,11 +82,9 @@ Usage: ./deb-get-repomd [options...]
   -output string
         Path to put the repodata files (default ".")
   -repo string
-        Repo path to use in fetching (default "dists/Debian11.2/main/binary-amd64")
+        Repo path to use in fetching (default "dists/stable/main/binary-amd64")
   -timeout duration
         HTTP Client Timeout (default 5s)
   -tree
         Make repo tree (recommended, provides gpg and InRelease files)
 ```
-
-Note: Debian GPG keys can be found at: https://ftp-master.debian.org/keys.html

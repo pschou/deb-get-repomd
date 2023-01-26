@@ -25,6 +25,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -50,11 +51,7 @@ type RepoHashFile struct {
 	Size         int
 }
 
-var client = http.Client{
-	Timeout: 5 * time.Second,
-}
-
-func readRepomdFile(repomdFile string, mirror string) *Repomd {
+func readRepomdFile(repomdFile, mirror string) *Repomd {
 	// Declare file handle for the reading
 	var file io.Reader
 
@@ -72,7 +69,16 @@ func readRepomdFile(repomdFile string, mirror string) *Repomd {
 		defer rawFile.Close()
 		file = rawFile
 	} else if strings.HasPrefix(repomdFile, "http") {
-		resp, err := client.Get(repomdFile)
+		u, err := url.Parse(repomdFile)
+		if err != nil {
+			log.Println(err)
+			return nil
+		}
+		if *secureUser != "" {
+			u.User = url.UserPassword(*secureUser, *securePass)
+		}
+
+		resp, err := http.DefaultClient.Get(u.String())
 		if err != nil {
 			log.Println("Error in HTTP get request", err)
 			return nil
@@ -170,7 +176,7 @@ func readWithChecksum(fileName, checksum, checksumType string) *[]byte {
 		defer rawFile.Close()
 		file = rawFile
 	} else if strings.HasPrefix(fileName, "http") {
-		resp, err := client.Get(fileName)
+		resp, err := http.DefaultClient.Get(fileName)
 		if err != nil {
 			log.Println("Error in HTTP get request", err)
 			return nil
